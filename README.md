@@ -1,8 +1,8 @@
 # k8s-via-vagrant
 
-🌐 Network Diagram for Your Kubernetes Cluster
+### 🌐 Network Diagram for Your Kubernetes Cluster
 
-📊 Complete Network Architecture
+### 📊 Complete Network Architecture
 
 <pre>
 
@@ -38,7 +38,7 @@
 
 </pre>
 
-🔍 Detailed Node View with Interfaces
+### 🔍 Detailed Node View with Interfaces
 
 <pre>
 
@@ -82,7 +82,7 @@
 
 </pre>
 
-🌐 Pod Network (Calico Overlay)
+### 🌐 Pod Network (Calico Overlay)
 
 <pre>
 
@@ -117,7 +117,8 @@
 +-------------------------------------------------------------------------------------+
 
 </pre>
-📊 Network Summary Table
+
+
 ### 📊 Network Summary Table
 
 | Network | CIDR | Purpose | Used By |
@@ -127,7 +128,7 @@
 | **Pod Network** | `172.16.0.0/16` | Pod-to-Pod communication | All Pods |
 | **Service Network** | `10.96.0.0/12` | Kubernetes Services | ClusterIP services |
 
-🔗 IP Address Allocation
+### 🔗 IP Address Allocation
 
 <pre>
 
@@ -155,7 +156,8 @@
 
 </pre>
 
-🔄 Traffic Flow Examples
+### 🔄 Traffic Flow Examples
+
 1. Pod-to-Pod (Same Node)
 
 <pre>
@@ -229,6 +231,7 @@
 </pre>
 
 ✅ Network Summary
+
 ### 🌐 Layered Network Architecture
 
 | Layer | Network | Range | Notes |
@@ -237,7 +240,6 @@
 | **Physical** | NAT | `10.0.2.0/24` | Internet access (Outbound) |
 | **Overlay** | Pod Network | `172.16.0.0/16` | Calico VXLAN encapsulation |
 | **Virtual** | Service | `10.96.0.0/12` | Kubernetes ClusterIP range |
-
 
 
 ### 📊 Comparison Table
