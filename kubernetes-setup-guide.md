@@ -245,27 +245,25 @@ bash /vagrant/join.sh --cri-socket unix:///run/containerd/containerd.sock
 
 ### 🎯 Quick Reference: Minimum Requirements
 
-</pre>
-
+```
 ┌─────────────────────────────────────────────────────────────────┐
-│              KUBERNETES CLUSTER CHECKLIST                       │
-│                                                                 │
-│  □ Swap disabled                                                │
-│  □ Kernel modules loaded (overlay, br_netfilter)                │
-│  □ Sysctl parameters set (ip_forward, bridge-nf-call)           │
-│  □ Container runtime installed (containerd)                     │
-│  □ Runc installed                                               │
-│  □ CNI plugins installed                                        │
-│  □ Containerd configured (SystemdCgroup, sandbox image)         │
-│  □ kubeadm, kubelet, kubectl installed                          │
-│  □ Kubelet node IP configured                                   │
-│  □ Cluster initialized (kubeadm init)                           │
-│  □ CNI plugin installed (Calico/Flannel)                        │
-│  □ Workers joined (kubeadm join)                                │
-│                                                                 │
+│                 KUBERNETES CLUSTER CHECKLIST                    │
+├─────────────────────────────────────────────────────────────────┤
+│ □ Swap disabled                                                 │
+│ □ Kernel modules loaded (overlay, br_netfilter)                 │
+│ □ Sysctl parameters set (ip_forward, bridge-nf-call)            │
+│ □ Container runtime installed (containerd)                      │
+│ □ Runc installed                                                │
+│ □ CNI plugins installed                                         │
+│ □ Containerd configured (SystemdCgroup, sandbox image)          │
+│ □ kubeadm, kubelet, kubectl installed                           │
+│ □ Kubelet node IP configured                                    │
+│ □ Cluster initialized (kubeadm init)                            │
+│ □ CNI plugin installed (Calico/Flannel)                         │
+│ □ Workers joined (kubeadm join)                                 │
 └─────────────────────────────────────────────────────────────────┘
+```
 
-</pre>
 
 ### 📁 Component Diagram
 
