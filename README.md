@@ -3,6 +3,8 @@
 🌐 Network Diagram for Your Kubernetes Cluster
 
 📊 Complete Network Architecture
+
+<pre>
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                              YOUR LAPTOP / HOST MACHINE                             │
 │                                                                                     │
@@ -36,6 +38,8 @@
 │  └──────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
+
+</pre>
 
 🔍 Detailed Node View with Interfaces
 
@@ -211,7 +215,7 @@
 | **Virtual** | Service | `10.96.0.0/12` | Kubernetes ClusterIP range |
 
 
-📊 Comparison Table
+
 ### 📊 Comparison Table
 
 | Issue | Original (❌) | Fixed (✅) |
