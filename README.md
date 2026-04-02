@@ -1,6 +1,6 @@
 # k8s-via-vagrant
 
-### 🌐 Network Diagram for Your Kubernetes Cluster
+### 🌐 Network Diagram for Kubernetes Cluster
 
 ### 📊 Complete Network Architecture
 
@@ -158,7 +158,7 @@
 
 ### 🔄 Traffic Flow Examples
 
-1. Pod-to-Pod (Same Node)
+**1. Pod-to-Pod (Same Node)**
 
 <pre>
 +-------------------------------------------------+
@@ -173,7 +173,7 @@
 +-------------------------------------------------+
 </pre>
 
-2. Pod-to-Pod (Different Nodes)
+**2. Pod-to-Pod (Different Nodes)**
 
 <pre>
 
@@ -196,7 +196,7 @@
 
 </pre>
 
-3. Pod-to-Internet
+**3. Pod-to-Internet**
 
 <pre>
 +--------------------------------------------------------------+
@@ -212,7 +212,7 @@
 +--------------------------------------------------------------+
 </pre>
 
-4. External-to-Service (NodePort)
+**4. External-to-Service (NodePort)**
 
 <pre>
 +--------------------------------------------------------------+
@@ -230,7 +230,8 @@
 +--------------------------------------------------------------+
 </pre>
 
-✅ Network Summary
+
+### ✅ Network Summary
 
 ### 🌐 Layered Network Architecture
 
