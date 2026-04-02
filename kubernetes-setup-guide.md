@@ -246,6 +246,7 @@ bash /vagrant/join.sh --cri-socket unix:///run/containerd/containerd.sock
 ### 🎯 Quick Reference: Minimum Requirements
 
 </pre>
+
 ┌─────────────────────────────────────────────────────────────────┐
 │              KUBERNETES CLUSTER CHECKLIST                       │
 │                                                                 │
@@ -263,6 +264,7 @@ bash /vagrant/join.sh --cri-socket unix:///run/containerd/containerd.sock
 │  □ Workers joined (kubeadm join)                                │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
+
 </pre>
 
 ### 📁 Component Diagram
