@@ -1,8 +1,24 @@
 VAGRANTFILE_API_VERSION = "2"
 
 BOX_NAME = "generic/ubuntu2204"
-NETWORK_BASE = "192.168.56"
-START = 24
+#NETWORK_BASE = "192.168.56"
+#START = 24
+
+# Network layout
+NETWORK_BASE = '192.168.56'
+START_OCTET = 24
+HOSTS = {
+  'master.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET}",
+  'worker1.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET + 1}",
+  'worker2.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET + 2}"
+}
+
+# Helper to append hosts into /etc/hosts
+HOSTS_APPENDER = <<-BASH
+  set -e
+  (grep -qxF "# ---- added by Vagrant ----" /etc/hosts) || echo "# ---- added by Vagrant ----" >> /etc/hosts
+  #{HOSTS.map { |h, ip| "grep -qxF '#{ip} #{h}' /etc/hosts || echo '#{ip} #{h}' >> /etc/hosts" }.join("\n  ")}
+BASH
 
 $setup = <<'SCRIPT'
 set -eux
