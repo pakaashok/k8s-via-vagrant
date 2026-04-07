@@ -43,3 +43,17 @@
 └─────────────────────────────────────────────────────────────────────────┘
 
 </pre>
+
+
+### Why Flannel Works ###
+
+| Problem | Calico | Flannel |
+| :--- | :--- | :--- |
+| **Interface detection** | ❌ Auto-detected wrong interface (`eth0`) | ✅ We specify `--iface=eth1` explicitly |
+| **Routing method** | ❌ BGP blocked by NAT | ✅ Always uses VXLAN (works through NAT) |
+| **Complexity** | ❌ 5+ components to configure | ✅ Single component (`flanneld`) |
+| **Resource usage** | ❌ ~400MB+ | ✅ ~50MB per node |
+
+
+### Bottom Line ###
+Calico is great for production, but requires proper network configuration. In VirtualBox with multiple NICs, Calico's auto-detection fails. Flannel is simpler and allows explicit interface configuration, making it ideal for local Vagrant/VirtualBox development environments.
