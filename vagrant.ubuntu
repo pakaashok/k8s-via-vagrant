@@ -1,29 +1,34 @@
 VAGRANTFILE_API_VERSION = "2"
 
 BOX_NAME = "generic/ubuntu2204"
-#NETWORK_BASE = "192.168.56"
-#START = 24
 
 # Network layout
 NETWORK_BASE = '192.168.56'
 START_OCTET = 24
+
 HOSTS = {
-  'master.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET}",
+  'master.kubedev.com'  => "#{NETWORK_BASE}.#{START_OCTET}",
   'worker1.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET + 1}",
   'worker2.kubedev.com' => "#{NETWORK_BASE}.#{START_OCTET + 2}"
 }
 
-# Helper to append hosts into /etc/hosts
-HOSTS_APPENDER = <<-BASH
-  set -e
-  (grep -qxF "# ---- added by Vagrant ----" /etc/hosts) || echo "# ---- added by Vagrant ----" >> /etc/hosts
-  #{HOSTS.map { |h, ip| "grep -qxF '#{ip} #{h}' /etc/hosts || echo '#{ip} #{h}' >> /etc/hosts" }.join("\n  ")}
-BASH
+$hosts_setup = <<-SCRIPT
+set -e
+echo "Configuring /etc/hosts..."
+grep -qxF '#{NETWORK_BASE}.#{START_OCTET} master.kubedev.com master' /etc/hosts || echo '#{NETWORK_BASE}.#{START_OCTET} master.kubedev.com master' >> /etc/hosts
+grep -qxF '#{NETWORK_BASE}.#{START_OCTET + 1} worker1.kubedev.com worker1' /etc/hosts || echo '#{NETWORK_BASE}.#{START_OCTET + 1} worker1.kubedev.com worker1' >> /etc/hosts
+grep -qxF '#{NETWORK_BASE}.#{START_OCTET + 2} worker2.kubedev.com worker2' /etc/hosts || echo '#{NETWORK_BASE}.#{START_OCTET + 2} worker2.kubedev.com worker2' >> /etc/hosts
+echo "/etc/hosts configured successfully"
+SCRIPT
 
 $setup = <<'SCRIPT'
 set -eux
 
 NODE_IP=$1
+
+echo "=========================================="
+echo "Setting up Kubernetes node with IP: ${NODE_IP}"
+echo "=========================================="
 
 # Disable swap
 swapoff -a
@@ -32,9 +37,9 @@ systemctl disable --now systemd-zram-setup@zram0.service 2>/dev/null || true
 
 # Base tools
 apt-get update -y
-apt-get install -y apt-transport-https ca-certificates curl wget gnupg lsb-release net-tools iproute2 bash-completion conntrack socat
+apt-get install -y apt-transport-https ca-certificates curl wget gnupg lsb-release net-tools iproute2 bash-completion conntrack socat ipset ipvsadm
 
-# Containerd (stable 1.7.x - production recommended)
+# Containerd
 VERSION="1.7.24"
 wget -q https://github.com/containerd/containerd/releases/download/v${VERSION}/containerd-${VERSION}-linux-amd64.tar.gz
 tar Cxzvf /usr/local containerd-${VERSION}-linux-amd64.tar.gz
@@ -53,11 +58,11 @@ mkdir -p /opt/cni/bin
 wget -q https://github.com/containernetworking/plugins/releases/download/${CNI}/cni-plugins-linux-amd64-${CNI}.tgz
 tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-${CNI}.tgz
 
-# Containerd config
+# Containerd config with SystemdCgroup and correct sandbox image
 mkdir -p /etc/containerd
 containerd config default > /etc/containerd/config.toml
 sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
-sed -i 's|sandbox_image = "registry.k8s.io/pause:3.8"|sandbox_image = "registry.k8s.io/pause:3.9"|' /etc/containerd/config.toml
+sed -i 's|sandbox_image = "registry.k8s.io/pause:.*"|sandbox_image = "registry.k8s.io/pause:3.9"|' /etc/containerd/config.toml
 systemctl restart containerd
 
 # Kernel modules
@@ -67,26 +72,31 @@ br_netfilter
 EOF
 modprobe overlay
 modprobe br_netfilter
+
+# Sysctl settings for Kubernetes networking
 cat <<EOF | tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables=1
-net.bridge.bridge-nf-call-ip6tables=1
-net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+net.ipv4.conf.all.forwarding        = 1
 EOF
 sysctl --system
 
-# Kubernetes
+# Kubernetes packages
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/k8s.gpg
 echo "deb [signed-by=/etc/apt/trusted.gpg.d/k8s.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
 apt-get update
 apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
-# Configure kubelet to use correct node IP
+# Configure kubelet to use correct node IP (critical for multi-NIC VMs)
 mkdir -p /etc/default
 echo "KUBELET_EXTRA_ARGS=--node-ip=${NODE_IP}" > /etc/default/kubelet
 
 systemctl enable kubelet
 kubeadm config images pull
+
+echo "Base setup completed for ${NODE_IP}"
 SCRIPT
 
 $master_post = <<'SCRIPT'
@@ -94,11 +104,16 @@ set -eux
 NODE_IP=$1
 
 if [ ! -f /etc/kubernetes/admin.conf ]; then
-  # Initialize cluster with Calico-compatible CIDR
+  echo "=========================================="
+  echo "Initializing Kubernetes Master"
+  echo "=========================================="
+
+  # Initialize cluster with Flannel CIDR
   kubeadm init \
     --apiserver-advertise-address=${NODE_IP} \
-    --pod-network-cidr=172.16.0.0/16 \
-    --cri-socket unix:///run/containerd/containerd.sock
+    --pod-network-cidr=10.244.0.0/16 \
+    --cri-socket unix:///run/containerd/containerd.sock \
+    --control-plane-endpoint=${NODE_IP}:6443
 
   # Setup kubeconfig for root
   mkdir -p /root/.kube
@@ -110,56 +125,67 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
   cp /etc/kubernetes/admin.conf /home/vagrant/.kube/config
   chown vagrant:vagrant /home/vagrant/.kube/config
 
-  # Install Calico Tigera Operator (production method)
-  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+  echo "=========================================="
+  echo "Installing Flannel CNI"
+  echo "=========================================="
 
-  # Wait for operator to be ready
+  # Download Flannel manifest
+  curl -sL https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml -o /tmp/kube-flannel.yml
+
+  # Patch Flannel to use eth1 (VirtualBox private network interface)
+  # This is critical for proper pod-to-pod communication across nodes
+  sed -i '/- --kube-subnet-mgr/a\        - --iface=eth1' /tmp/kube-flannel.yml
+
+  kubectl apply -f /tmp/kube-flannel.yml
+
+  echo "=========================================="
+  echo "Waiting for Control Plane Components"
+  echo "=========================================="
+
+  # Wait for CoreDNS to be ready
+  echo "Waiting for CoreDNS..."
+  kubectl wait --for=condition=ready pod -l k8s-app=kube-dns -n kube-system --timeout=180s
+
+  # Wait for Flannel to be ready
+  echo "Waiting for Flannel..."
   sleep 10
+  kubectl wait --for=condition=ready pod -l app=flannel -n kube-flannel --timeout=180s || true
 
-  # Configure Calico with custom CIDR
-  cat <<EOF | kubectl apply -f -
-apiVersion: operator.tigera.io/v1
-kind: Installation
-metadata:
-  name: default
-spec:
-  calicoNetwork:
-    ipPools:
-    - cidr: 172.16.0.0/16
-      encapsulation: VXLANCrossSubnet
-      natOutgoing: Enabled
-      nodeSelector: all()
----
-apiVersion: operator.tigera.io/v1
-kind: APIServer
-metadata:
-  name: default
-spec: {}
-EOF
+  # Verify all system pods
+  echo "System pods status:"
+  kubectl get pods -A
 
-  # Wait for Calico to initialize
-  echo "Waiting for Calico to be ready..."
-  sleep 30
-
-  # Generate join command
+  # Generate join command for workers
   kubeadm token create --print-join-command > /vagrant/join.sh
   chmod +x /vagrant/join.sh
+
+  echo "=========================================="
+  echo "Master initialization complete!"
+  echo "Join command saved to /vagrant/join.sh"
+  echo "=========================================="
 fi
 SCRIPT
 
 $worker_join = <<'SCRIPT'
 set -eux
-# Wait for join script
-for i in {1..30}; do
+
+echo "=========================================="
+echo "Joining worker to cluster"
+echo "=========================================="
+
+# Wait for join script from master
+for i in {1..60}; do
   [ -f /vagrant/join.sh ] && break
-  echo "Waiting for join.sh..."
-  sleep 10
+  echo "Waiting for join.sh... attempt $i/60"
+  sleep 5
 done
 
 if [ -f /vagrant/join.sh ]; then
+  echo "Found join.sh, joining cluster..."
   bash /vagrant/join.sh --cri-socket unix:///run/containerd/containerd.sock
+  echo "Successfully joined the cluster!"
 else
-  echo "ERROR: join.sh not found!"
+  echo "ERROR: join.sh not found after 5 minutes!"
   exit 1
 fi
 SCRIPT
@@ -173,36 +199,43 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.cpus = 2
   end
 
-  # Master
+  # ================== MASTER NODE ==================
   config.vm.define "master", primary: true do |m|
     m.vm.hostname = "master"
-    m.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START}"
+    m.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START_OCTET}"
     m.vm.provider "virtualbox" do |v|
       v.memory = 5120
+      v.name = "k8s-master"
     end
-    m.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START}"]
-    m.vm.provision "shell", inline: $master_post, args: ["#{NETWORK_BASE}.#{START}"]
+    m.vm.provision "shell", inline: $hosts_setup
+    m.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START_OCTET}"]
+    m.vm.provision "shell", inline: $master_post, args: ["#{NETWORK_BASE}.#{START_OCTET}"]
   end
 
-  # Worker1
+  # ================== WORKER 1 ==================
   config.vm.define "worker1" do |w|
     w.vm.hostname = "worker1"
-    w.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START + 1}"
+    w.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START_OCTET + 1}"
     w.vm.provider "virtualbox" do |v|
       v.memory = 3072
+      v.name = "k8s-worker1"
     end
-    w.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START + 1}"]
+    w.vm.provision "shell", inline: $hosts_setup
+    w.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START_OCTET + 1}"]
     w.vm.provision "shell", inline: $worker_join
   end
 
-  # Worker2
+  # ================== WORKER 2 ==================
   config.vm.define "worker2" do |w|
     w.vm.hostname = "worker2"
-    w.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START + 2}"
+    w.vm.network :private_network, ip: "#{NETWORK_BASE}.#{START_OCTET + 2}"
     w.vm.provider "virtualbox" do |v|
       v.memory = 3072
+      v.name = "k8s-worker2"
     end
-    w.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START + 2}"]
+    w.vm.provision "shell", inline: $hosts_setup
+    w.vm.provision "shell", inline: $setup, args: ["#{NETWORK_BASE}.#{START_OCTET + 2}"]
     w.vm.provision "shell", inline: $worker_join
   end
 end
+
