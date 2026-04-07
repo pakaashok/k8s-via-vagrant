@@ -191,5 +191,25 @@
 | **Resource usage** | ❌ ~400MB+ | ✅ ~50MB per node |
 
 
+### Comparison Table ###
+
+| Issue | Original (❌) | Fixed (✅) |
+| :--- | :--- | :--- |
+| **Containerd Version** | 2.0.0 (unstable) | 1.7.24 (stable) |
+| **Pod CIDR** | 192.168.0.0/16 (overlaps nodes) | 172.16.0.0/16 (no conflict) |
+| **Node IP Config** | Not set (wrong NIC binding) | Explicitly set via `KUBELET_EXTRA_ARGS` |
+| **API Server Address** | Not set (may bind to NAT) | Set to `--apiserver-advertise-address` |
+| **Master Memory** | 2458 MB (too low) | 5120 MB (5GB) |
+| **Worker Memory** | 1500 MB (borderline) | 3072 MB (3GB) |
+| **Sandbox Image** | Not configured | Set to `pause:3.9` |
+| **Package Hold** | No | Yes (`apt-mark hold`) |
+| **Vagrant User Kubeconfig** | No | Yes |
+| **Worker Wait Loop** | No (may fail) | Yes (waits up to 5 min) |
+| **Calico Install** | Simple manifest | Tigera Operator (production) |
+| **Missing Package** | No `socat` | Includes `socat` |
+| **Pre-pull Images** | No | Yes (`kubeadm config images pull`) |
+| **Primary Node Flag** | No | Yes (master is primary) |
+
+
 ### Bottom Line ###
 Calico is great for production, but requires proper network configuration. In VirtualBox with multiple NICs, Calico's auto-detection fails. Flannel is simpler and allows explicit interface configuration, making it ideal for local Vagrant/VirtualBox development environments.
